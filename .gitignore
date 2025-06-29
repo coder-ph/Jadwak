@@ -1,0 +1,43 @@
+# virtual environment directories
+venv/
+.venv/
+.env
+env/
+
+#db files
+*.sqlite3
+*.db
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# static files
+staticfiles/
+static/
+media/
+
+# Django migrations
+migrations/
+
+Log files
+*.log
+
+# Local settings
+local_settings.py
+
+# IDE specific files
+.idea/
+.vscode/
+
+#pyenv
+.python-version
+
+# coverage reports
+.coverage
+
+# celery beat schedule
+celerybeat-schedule
+# celery worker state
+celerybeat.pid
