@@ -13,6 +13,6 @@ from django.core.wsgi import get_wsgi_application
 
 # Check for DJANGO_SETTINGS_MODULE environment variable
 # If not set, default to production settings (as WSGI is typically for production)
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'jenga_platform.settings.prod')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "jenga_platform.settings.prod")
 
 application = get_wsgi_application()
