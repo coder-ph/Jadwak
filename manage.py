@@ -8,7 +8,7 @@ def main() -> None:
     """Run administrative tasks."""
     # Check for DJANGO_SETTINGS_MODULE environment variable
     # If not set, default to development settings
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Jadwak.settings.dev")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Backend.settings.dev")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
