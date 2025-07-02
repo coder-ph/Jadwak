@@ -1,0 +1,73 @@
+# .pre-commit-config.yaml
+# Placed at the absolute root of your project
+
+repos:
+  # Standard hooks provided by pre-commit itself
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0 # Latest stable rev as of now
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer # Ensures files end with a newline
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files # Prevents committing excessively large files
+      - id: check-merge-conflict # Detects unresolved merge conflict markers
+      - id: check-toml # Checks TOML files (like pixi.toml) for syntax errors
+      - id: check-case-conflict # Checks for files that differ only in case (problematic on non-case-sensitive filesystems)
+      - id: debug-statements # <--- ADDED: Catches common debugging statements (pdb, breakpoint)
+
+  # Black - Python code formatter
+  - repo: https://github.com/psf/black
+    rev: 23.7.0 # Keep this version, it's recent and good
+    hooks:
+      - id: black
+        language_version: python3.13.5 # <--- CRITICAL CHANGE: Matches your Docker Python version
+
+  # Flake8 - Python linter
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0 # Keep this version
+    hooks:
+      - id: flake8
+        args: ["--max-line-length=120"] # Example: allow lines up to 120 characters
+        additional_dependencies:
+          - flake8-annotations      # Check type hints
+          - flake8-bugbear          # Catch common programming bugs
+          - flake8-comprehensions   # Check list/dict comprehensions
+          - flake8-docstrings       # Check docstring style (requires pydocstyle to be installed too)
+          - flake8-isort            # Check import order (requires isort to be run separately or configured as a hook)
+        language_version: python3.13.5 # <--- CRITICAL CHANGE: Matches your Docker Python version
+
+  # isort - Python import sorter
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.12.0 # Keep this version
+    hooks:
+      - id: isort
+        name: isort (python)
+        types: [python]
+        args: ["--profile", "black"] # Use black profile for compatibility with black formatter
+        language_version: python3.13.5 # <--- CRITICAL CHANGE: Matches your Docker Python version
+
+  # Bandit - Python security linter
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.0 # Keep this version
+    hooks:
+      - id: bandit
+        # Scan the entire project root ('.') and exclude common non-code directories
+        args: ["--exclude", "tests/,migrations/,media/,staticfiles/,venv/,.pixi/"]
+        # Bandit also accepts a .banditrc file for more granular configuration
+        language_version: python3.13 # <--- CRITICAL CHANGE: Matches your Docker Python version
+
+  # Optional: Django-specific check for missing migrations
+  # This hook runs a shell script. Create `scripts/check_migrations.sh` and make it executable.
+#   - repo: local
+#     hooks:
+#       - id: django-makemigrations
+#         name: Check for unapplied Django migrations
+#         entry: bash -c "python manage.py makemigrations --check --dry-run"
+#         language: system # Runs the command from the host system's shell
+#         always_run: true # Always run, even if no files changed, as migrations affect the whole project state
+#         pass_filenames: false
+#          # CRITICAL: Set DJANGO_SETTINGS_MODULE for local Django commands
+# +        ار:
+# +          DJANGO_SETTINGS_MODULE: Jadwak.settings.dev # Use your dev settings # Don't pass filenames, run on whole project
+#         # This hook will fail if `makemigrations --check --dry-run` detects unapplied changes

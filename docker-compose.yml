@@ -1,0 +1,105 @@
+
+
+
+
+
+services:
+  # Django web service
+  web:
+    build:
+      context: . # Build from the current directory (project root, where Dockerfile is)
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000 # Command to run Django dev server
+    volumes:
+      - .:/app # Mount the current host directory (project root) to /app in the container for live code changes
+      - /app/staticfiles # Exclude staticfiles from host mount if built inside container later
+      - /app/media # Exclude media from host mount if using S3 in prod but local for dev
+    ports:
+      - "8001:8000" # Map host port 8001 to container port 8000 (changed from 8000:8000 to avoid potential host conflicts)
+    env_file:
+      - ./.env # Load environment variables from .env file, now at the project root
+    depends_on: # Ensure db and redis are up before web starts
+      - db
+      - redis
+    networks:
+      - jenga_network # Use a custom network for all services
+    environment:
+      DJANGO_SETTINGS_MODULE: Jadwak.settings.dev # Explicitly set for web service
+      PYTHONPATH: /app # Add /app to the Python path
+
+  # PostgreSQL with PostGIS database service
+  db:
+    image: postgis/postgis:15-3.3 # Use a stable PostGIS image (e.g., PostgreSQL 15, PostGIS 3.3)
+    environment: # Database credentials, should match your Django settings
+      POSTGRES_DB: Jadwak
+      POSTGRES_USER: phelix
+      POSTGRES_PASSWORD: 34561625Pph
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Persistent volume for database data
+    ports:
+      - "5432:5432" # Optional: expose DB port to host for direct connection (e.g., via DB client)
+    networks:
+      - jenga_network
+
+  # Redis service for Celery broker and cache
+  redis:
+    image: redis:7-alpine # Lightweight Redis image
+    command: redis-server --appendonly yes # Ensure data persistence
+    volumes:
+      - redis_data:/data # Persistent volume for Redis data
+    ports:
+      - "6379:6379" # Optional: expose Redis port to host for direct connection
+    networks:
+      - jenga_network
+
+  # Celery worker service
+  celery_worker:
+    build:
+      context: . # Build from the current directory
+      dockerfile: Dockerfile # Use the same Dockerfile as the web service
+    # Command to run Celery worker. IMPORTANT: `-A Jadwak` because your project module is named `Jadwak`
+    command: celery -A Jadwak worker -l info
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - redis
+      - web # Depends on web if your Celery tasks need to interact with Django models/settings
+    networks:
+      - jenga_network
+    environment:
+      DJANGO_SETTINGS_MODULE: Jadwak.settings.dev # Explicitly set for worker
+      PYTHONPATH: /app # Add /app to the Python path
+
+  # Optional: Celery beat service for scheduled tasks
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Command to run Celery beat. IMPORTANT: `-A Jadwak` because your project module is named `Jadwak`
+    command: celery -A Jadwak beat -l info --scheduler django_celery_beat.schedulers.DatabaseScheduler # Example with django-celery-beat
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - redis
+      - web # Beat needs to access Django settings and potentially the DB for scheduler
+    networks:
+      - jenga_network
+    environment:
+      DJANGO_SETTINGS_MODULE: Jadwak.settings.dev # Explicitly set for beat
+      PYTHONPATH: /app # Add /app to the Python path
+
+# Define named volumes for data persistence
+volumes:
+  postgres_data:
+  redis_data:
+
+# Define a custom network for better isolation and naming
+networks:
+  jenga_network:
+    driver: bridge
