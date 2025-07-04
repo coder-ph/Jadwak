@@ -9,7 +9,8 @@ DEBUG = False
 
 # Allowed hosts in production (your domain names)
 ALLOWED_HOSTS = env.list(
-    "DJANGO_ALLOWED_HOSTS", default=["yourdomain.com", "www.yourdomain.com"]
+    "DJANGO_ALLOWED_HOSTS",
+    default=["yourdomain.com", "www.yourdomain.com", "api.example.com"],
 )
 
 # Security settings
@@ -29,7 +30,8 @@ SECURE_PROXY_SSL_HEADER = (
 # CORS settings for production (restrict to your frontend domain)
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list(
-    "DJANGO_CORS_ALLOWED_ORIGINS", default=["https://yourfrontend.com"]
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    default=["https://yourfrontend.com", "https://www.yourfrontend.com"],
 )
 
 # Static and media files in production (S3 or similar)
@@ -57,7 +59,7 @@ LOGGING = {
         "file": {
             "level": "INFO",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs/jenga.log"),
+            "filename": os.path.join(BASE_DIR, "logs/jadwak.log"),
             "maxBytes": 1024 * 1024 * 5,  # 5 MB
             "backupCount": 5,
             "formatter": "verbose",
@@ -76,7 +78,7 @@ LOGGING = {
             "level": "INFO",
             "propagate": True,
         },
-        "jenga_platform": {  # Your project-specific logger
+        "jadwak": {  # Your project-specific logger
             "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
