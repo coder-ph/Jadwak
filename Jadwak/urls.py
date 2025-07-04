@@ -54,5 +54,5 @@ urlpatterns = [
         schema_view.with_ui("redoc", cache_timeout=0),
         name="schema-redoc",
     ),
-    path("api/v1/auth/", include("rest_framework_simplejwt.urls")),
+    # path("api/v1/auth/", include("rest_framework_simplejwt.urls")),
 ]
