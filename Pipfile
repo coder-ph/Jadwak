@@ -11,6 +11,7 @@ pre-commit = "*"
 djangorestframework = "*"
 drf-yasg = "*"
 django-cors-headers = "*"
+djangorestframework-gis = "*"
 
 [dev-packages]
 pre-commit = "*"

@@ -12,9 +12,9 @@ class SiteAdmin(admin.GISModelAdmin):
 
     list_display = ("name", "owner", "created_at", "updated_at")
     list_filter = ("owner", "created_at", "updated_at")
-    default_lat = 0
-    default_lon = 0
-    default_zoom = 3
+    default_lat = 36.817223
+    default_lon = -1.2863
+    default_zoom = 12
 
 
 @admin.register(GISLayer)
