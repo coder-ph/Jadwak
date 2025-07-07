@@ -7,7 +7,7 @@ from .models import GISLayer, Site
 
 # Register your models here.
 @admin.register(Site)
-class SiteAdmin(admin.OSMGeoAdmin):
+class SiteAdmin(admin.GISModelAdmin):
     """Admin interface for the Site model."""
 
     list_display = ("name", "owner", "created_at", "updated_at")
