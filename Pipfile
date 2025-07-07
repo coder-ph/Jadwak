@@ -12,6 +12,8 @@ djangorestframework = "*"
 drf-yasg = "*"
 django-cors-headers = "*"
 djangorestframework-gis = "*"
+django-filter = "*"
+rest-framework-simplejwt = "*"
 
 [dev-packages]
 pre-commit = "*"

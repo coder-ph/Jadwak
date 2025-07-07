@@ -34,6 +34,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.2
 redis==6.2.0
+rest-framework-simplejwt==0.0.2
 six==1.17.0
 sqlparse==0.5.3
 tzdata==2025.2
@@ -41,3 +42,4 @@ uritemplate==4.2.0
 vine==5.1.0
 virtualenv==20.31.2
 wcwidth==0.2.13
+djangorestframework-simplejwt
