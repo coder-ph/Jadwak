@@ -13,7 +13,7 @@ services:
     volumes:
       - .:/app # Mount the current host directory (project root) to /app in the container for live code changes
       - /app/staticfiles # Exclude staticfiles from host mount if built inside container later
-      - /app/media # Exclude media from host mount if using S3 in prod but local for dev
+      # - /app/media # Exclude media from host mount if using S3 in prod but local for dev
     ports:
       - "8001:8000" # Map host port 8001 to container port 8000 (changed from 8000:8000 to avoid potential host conflicts)
     env_file:
