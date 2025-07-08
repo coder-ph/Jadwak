@@ -43,3 +43,6 @@ vine==5.1.0
 virtualenv==20.31.2
 wcwidth==0.2.13
 djangorestframework-simplejwt
+pytest
+pytest-django
+factory-boy

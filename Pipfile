@@ -17,6 +17,9 @@ rest-framework-simplejwt = "*"
 
 [dev-packages]
 pre-commit = "*"
+pytest = "*"
+pytest-django = "*"
+factory-boy = "*"
 
 [requires]
 python_version = "3.13"
