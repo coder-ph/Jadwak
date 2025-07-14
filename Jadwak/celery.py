@@ -1,8 +1,10 @@
 """Celery configuration for Jadwak project."""
 
+import os
+
 from celery import Celery, Task
 
-# os.environ.setdefault("DJANGO_SETTINGS_MODULE", "jadwak.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Jadwak.settings.dev")
 
 app = Celery("jadwak")
 

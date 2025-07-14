@@ -1,9 +1,9 @@
-"""serializers module for core app."""
+"""Serializers module for the core app."""
 
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import GISLayer, Site
+from .models import GISLayer, SatelliteImage, Site
 
 
 class SiteSerializer(GeoFeatureModelSerializer):
@@ -12,7 +12,7 @@ class SiteSerializer(GeoFeatureModelSerializer):
     owner_username = serializers.ReadOnlyField(source="owner.username")
 
     class Meta:
-        """meta options for the SiteSerializer."""
+        """Meta options for the SiteSerializer."""
 
         model = Site
         geo_field = "boundary"
@@ -46,11 +46,39 @@ class GISLayerSerializer(serializers.ModelSerializer):
         model = GISLayer
         fields = (
             "id",
-            "name",
             "site",
+            "name",
+            "file",
             "layer_type",
-            "data",
             "is_active",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("created_at", "updated_at")
+
+
+class SatelliteImageSerializer(GeoFeatureModelSerializer):
+    """Serializer for the SatelliteImage model with GeoJSON footprint."""
+
+    site_name = serializers.ReadOnlyField(source="site.name")
+
+    class Meta:
+        """Meta options for the SatelliteImageSerializer."""
+
+        model = SatelliteImage
+        geo_field = "footprint"
+        fields = (
+            "id",
+            "site",
+            "site_name",
+            "image_file",
+            "date_captured",
+            "resolution_m_per_pixel",
+            "source",
+            "cloud_cover_percentage",
+            "footprint",
+            "metadata",
+            "status",
             "created_at",
             "updated_at",
         )

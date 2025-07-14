@@ -45,4 +45,5 @@ wcwidth==0.2.13
 djangorestframework-simplejwt
 pytest
 pytest-django
+pytz
 factory-boy

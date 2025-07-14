@@ -14,12 +14,19 @@ django-cors-headers = "*"
 djangorestframework-gis = "*"
 django-filter = "*"
 rest-framework-simplejwt = "*"
+django-celery-results = "*"
+django-celery-beat = "*"
+pytz = "*"
 
 [dev-packages]
 pre-commit = "*"
 pytest = "*"
 pytest-django = "*"
 factory-boy = "*"
+black = "*"
+flake8 = "*"
+isort = "*"
+bandit = "*"
 
 [requires]
 python_version = "3.13"

@@ -91,3 +91,98 @@ class GISLayer(models.Model):
     def __str__(self: "GISLayer") -> str:
         """Return string representation of the GISLayer model."""
         return f"{self.name} ({self.name}) - {self.site.name}"
+
+
+class SatelliteImage(models.Model):
+    """Model representing a satellite image associated with a site."""
+
+    IMAGE_SOURCE_CHOICES = [
+        ("SENTINEL2", "Sentinel-2"),
+        ("PLANETLABS", "Planet Labs"),
+        ("MAXAR", "Maxar"),
+        ("OTHER", "Other"),
+    ]
+
+    IMAGE_STATUS_CHOICES = [
+        ("PENDING", "Pending Fetch"),
+        ("FETCHED", "Image Fetched"),
+        ("FAILED", "Fetch Failed"),
+        ("PROCESSED", "Processed (Detections Complete)"),
+        ("RAW_UPLOAD", "Raw Upload (Awaiting Processing)"),
+    ]
+
+    site = models.ForeignKey(
+        "core.site",
+        on_delete=models.CASCADE,
+        related_name="satellite_images",
+        help_text="Site associated with this satellite image",
+    )
+    image_file = models.FileField(
+        upload_to="satellite_images/",
+        help_text="Satellite image file data",
+    )
+
+    date_captured = models.DateTimeField(
+        help_text="Date and time when the image was captured",
+    )
+
+    resolution_m_per_pixel = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Resolution of the image in meters per pixel",
+    )
+
+    source = models.CharField(
+        max_length=50,
+        choices=IMAGE_SOURCE_CHOICES,
+        default="OTHER",
+        help_text="Source of the satellite image",
+    )
+
+    cloud_cover_percentage = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Percentage of cloud cover in the image",
+    )
+
+    footprint = models.PolygonField(
+        srid=4326,
+        help_text="Geospatial footprint of the satellite image (WGS84)",
+    )
+
+    metadata = models.JSONField(
+        blank=True,
+        null=True,
+        default=dict,
+        help_text="Flexible JSON for additional image-specific metadata",
+    )
+
+    status = models.CharField(
+        max_length=50,
+        choices=IMAGE_STATUS_CHOICES,
+        default="PENDING",
+        help_text="Current status of the satellite image",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when the satellite image was created",
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp when the satellite image was last updated",
+    )
+
+    class Meta:
+        """Meta options for the SatelliteImage model."""
+
+        verbose_name = "Satellite Image"
+        verbose_name_plural = "Satellite Images"
+        ordering = ["date_captured"]
+
+    def __str__(self: "SatelliteImage") -> str:
+        """Return string representation of the SatelliteImage model."""
+        return f"{self.site.name} - {self.date_captured.strftime('%Y-%m-%d %H:%M:%S')}"
