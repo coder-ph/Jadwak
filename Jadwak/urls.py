@@ -57,6 +57,7 @@ urlpatterns = [
         name="schema-redoc",
     ),
     # path("api/v1/auth/", include("rest_framework_simplejwt.urls")),
+    path("api/v1/detections/", include("detection.urls")),
 ]
 
 if settings.DEBUG:

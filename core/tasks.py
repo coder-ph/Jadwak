@@ -12,6 +12,8 @@ from django.utils import timezone
 from core.models import SatelliteImage, Site
 from core.providers.imagery.sentinel2 import Sentinel2Provider
 
+from detection.tasks import process_image_detections
+
 
 @shared_task
 def example_task(arg1: int, arg2: str) -> int:
@@ -94,8 +96,10 @@ def fetch_sentinel2_imagery(
                     )
                     fetched_count += 1
                     print(
-                        f"Successfully created SatelliteImage: {satellite_image.pk} for site {site.name}"
+                        f"Successfully created SatelliteImage: {satellite_image.pk} "
+                        f"for site {site.name}. Triggering AI processing"
                     )
+                    process_image_detections.delay(satellite_image.pk)
 
             except Exception as e:
                 print(

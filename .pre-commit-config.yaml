@@ -28,10 +28,10 @@ repos:
           - flake8-bugbear
           - flake8-comprehensions
           - flake8-docstrings
-          # - flake8-isort  # ❌ comment out to skip import order checks
+          # - flake8-isort  #
         language_version: python3.13.5
 
-  # - repo: https://github.com/PyCQA/isort  # ❌ disabled
+  # - repo: https://github.com/PyCQA/isort  #
   #   rev: 5.12.0
   #   hooks:
   #     - id: isort

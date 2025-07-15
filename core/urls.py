@@ -23,4 +23,11 @@ urlpatterns = [
         SatelliteImageViewSet.as_view({"get": "retrieve"}),
         name="site-satelliteimage-detail",
     ),
+    path(
+        "sites/<int:site_pk>/images/<int:pk>/run-detection/",
+        SatelliteImageViewSet.as_view(
+            {"post": "run_detection"}
+        ),  # Map POST request to run_detection method
+        name="satelliteimage-run-detection",
+    ),
 ]

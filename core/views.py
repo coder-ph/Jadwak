@@ -1,25 +1,27 @@
 """view definitions for core app."""
 
-from datetime import datetime  # Line 6
+from datetime import datetime
 
 # Third-party imports
-from django.db.models import QuerySet  # Line 9
-from django.shortcuts import get_object_or_404  # Line 10
-from django_filters import DateFromToRangeFilter, FilterSet  # Line 11
-from django_filters import rest_framework as filters  # Line 12
-from django_filters.rest_framework import DjangoFilterBackend  # Line 13
-from rest_framework import permissions, status, viewsets  # Line 14
-from rest_framework.decorators import action  # Line 15
-from rest_framework.request import Request  # Line 16
-from rest_framework.response import Response  # Line 17
-from rest_framework.views import APIView  # Line 18
+from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
+from django_filters import DateFromToRangeFilter, FilterSet
+from django_filters import rest_framework as filters
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 # Local application imports (your project's own modules)
-from core.tasks import fetch_sentinel2_imagery  # Line 21
+from core.tasks import fetch_sentinel2_imagery
 
-from .models import GISLayer, SatelliteImage, Site  # Line 25
-from .serializers import GISLayerSerializer  # Line 26
-from .serializers import SatelliteImageSerializer, SiteSerializer  # Line 27
+from .models import GISLayer, SatelliteImage, Site
+from .serializers import GISLayerSerializer
+from .serializers import SatelliteImageSerializer, SiteSerializer
+
+from detection.tasks import process_image_detections
 
 
 class IsSiteOwnerOrAdmin(permissions.BasePermission):
@@ -160,3 +162,41 @@ class SatelliteImageViewSet(viewsets.ReadOnlyModelViewSet):
         if site_pk is None:
             return SatelliteImage.objects.none()
         return SatelliteImage.objects.filter(site__pk=site_pk).select_related("site")
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="run-detection",
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def run_detection(
+        self: "SatelliteImageViewSet", request: Request, **kwargs: any
+    ) -> Response:
+        """Trigger AI detection processing for a specific SatelliteImage."""
+        # Access URL parameters from self.kwargs
+        site_pk = self.kwargs.get("site_pk")
+        pk = self.kwargs.get("pk")  # This is the SatelliteImage ID
+
+        # Check if site_pk and pk are available (should be from URL)
+        if not site_pk or not pk:
+            return Response(
+                {
+                    "error": "Both site_pk and image ID (pk) must be provided in the URL."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        satellite_image = get_object_or_404(
+            SatelliteImage, pk=pk, site__pk=self.kwargs.get("site_pk")
+        )
+
+        if not request.user.is_staff and satellite_image.site.owner != request.user:
+            return Response(
+                {"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        process_image_detections.delay(satellite_image.pk)
+
+        return Response(
+            {"message": "AI detection processing initiated successfully."},
+            status=status.HTTP_202_ACCEPTED,
+        )
