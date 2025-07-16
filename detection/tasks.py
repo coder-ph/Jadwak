@@ -1,24 +1,22 @@
 """Celery tasks for processing satellite imagery and detecting changes."""
 
+import random
+
 from celery import shared_task
 from celery.app.task import Task  # Import Task for type hinting 'self'
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
-# from django.utils import timezone as django_timezone  # Removed: F401 unused import
 
 # Import models
-from core.models import SatelliteImage, Site  # Import Site model for ChangeLog
-from detection.models import Detection, ChangeLog  # Import ChangeLog
+from core.models import SatelliteImage, Site
+from detection.models import Detection, ChangeLog
+from alerts.tasks import generate_alerts
 
-# Import the AI client
+
 from detection.client import AIMicroserviceClient
 
-# import pytz  # Removed: F401 unused import
-# from datetime import datetime # Removed: F401 unused import
 
-
-# --- Task for AI processing (existing, just updated trigger) ---
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def process_image_detections(self: Task, satellite_image_id: int) -> str:
     """Celery task to send a SatelliteImage to the AI microservice for detection.
@@ -77,10 +75,10 @@ def process_image_detections(self: Task, satellite_image_id: int) -> str:
             f"{detections_count} detections. Triggering change detection."
         )
 
-        # --- CRITICAL ADDITION: Trigger change detection task ---
-        # Trigger the change detection task for this site after image processing
-        detect_site_changes.delay(site_id=satellite_image.site.id)
-        # ----------------------------------------------------
+        # Calling the (now unified) detect_site_changes task
+        detect_site_changes.delay(
+            site_id=satellite_image.site.id, processed_image_id=satellite_image.pk
+        )
 
         return (
             f"Processed image {satellite_image.pk}: " f"{detections_count} detections."
@@ -100,117 +98,135 @@ def process_image_detections(self: Task, satellite_image_id: int) -> str:
         self.retry(exc=e)
 
 
-# --- NEW TASK: Change Detection Logic ---
+# --- Change Detection Logic (Unified and Corrected) ---
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
-def detect_site_changes(self: Task, site_id: int) -> str:
+def detect_site_changes(self: Task, site_id: int, processed_image_id: int) -> str:
     """Celery task to detect changes on a site.
 
-    Compares the latest two processed satellite images and their detections.
+    Compares detections between the newly processed image and a previous image.
+    This is a simplified/mocked change detection.
     """
     try:
         site = get_object_or_404(Site, id=site_id)
-        print(f"Detecting changes for Site: {site.name} ({site.id})")
-
-        # 1. Identify the latest two PROCESSED SatelliteImage records for the site.
-        # Ensure they are ordered by date_captured descending.
-        latest_images = SatelliteImage.objects.filter(
-            site=site,
-            status="PROCESSED",  # Only consider images that have been processed
-        ).order_by("-date_captured")[
-            :2
-        ]  # Get the top 2 most recent
-
-        if len(latest_images) < 2:
-            print(
-                f"Not enough processed images for site {site.name} to perform change "
-                f"detection (found {len(latest_images)})."
-            )
-            return "Insufficient images for change detection."
-
-        image_after = latest_images[0]  # Most recent image
-        image_before = latest_images[1]  # Second most recent image
-
-        print(
-            f"Comparing Image: {image_before.pk} (Captured: "
-            f"{image_before.date_captured.date()}) "
-            f"with Image: {image_after.pk} (Captured: "
-            f"{image_after.date_captured.date()})"
+        # Ensure processed_image is fetched directly for this task,
+        # in case the task chain order changes or the image wasn't fully saved yet.
+        processed_image = get_object_or_404(
+            SatelliteImage, id=processed_image_id, site=site
         )
 
-        # 2. Retrieve all Detection objects for both images.
-        detections_before = Detection.objects.filter(
-            satellite_image=image_before
-        ).count()
-        detections_after = Detection.objects.filter(satellite_image=image_after).count()
+        print(
+            f"Detecting changes for Site: {site.name} ({site.id}) "
+            f"using image {processed_image.pk}."
+        )
+
+        # Find the most recent *processed* image captured *before* the current one.
+        # This assumes images are processed in order, or we want to compare with the
+        # immediate prior.
+        previous_image = (
+            SatelliteImage.objects.filter(
+                site=site,
+                status="PROCESSED",  # Only compare with processed images
+                date_captured__lt=processed_image.date_captured,  # Images captured before
+            )
+            .exclude(pk=processed_image.pk)
+            .order_by("-date_captured")
+            .first()
+        )
+
+        if not previous_image:
+            # If this is the first processed image for the site,
+            # log it but no comparison possible.
+            print(
+                f"No previous processed image found for site {site.name}. "
+                "No comparison made."
+            )
+            # Optionally create a "SITE_INITIALIZED" ChangeLog here.
+            return f"No previous image for site {site.name}. Change detection skipped."
+
+        print(
+            f"Comparing Image: {previous_image.pk} (Captured: "
+            f"{previous_image.date_captured.date()}) "
+            f"with Image: {processed_image.pk} (Captured: "
+            f"{processed_image.date_captured.date()})"
+        )
+
+        # --- SIMPLIFIED MOCK CHANGE DETECTION LOGIC ---
+        current_detections_count = processed_image.detections.count()
+        previous_detections_count = previous_image.detections.count()
 
         change_type = "NO_CHANGE"
-        description = "No significant change detected."
+        description = (
+            "No significant change in detection count."  # Corrected F541, removed f""
+        )
         metadata = {
-            "image_before_id": image_before.pk,
-            "image_after_id": image_after.pk,
-            "detections_before_count": detections_before,
-            "detections_after_count": detections_after,
+            "image_before_id": previous_image.pk,
+            "image_after_id": processed_image.pk,
+            "detections_before_count": previous_detections_count,
+            "current_detection_count": current_detections_count,
             "change_details": {},  # Placeholder for more detailed diff
         }
 
-        # 3. Implement basic comparison logic (e.g., based on count of detections)
-        if detections_after > detections_before:
+        if current_detections_count > previous_detections_count:
             change_type = "NEW_DETECTIONS"
             description = (
-                f"New objects detected: {detections_after - detections_before} "
-                "more objects than previous image."
+                f"Increased detections from {previous_detections_count} to "
+                f"{current_detections_count}."
             )
-        elif detections_after < detections_before:
+        elif current_detections_count < previous_detections_count:
             change_type = "REMOVED_DETECTIONS"
             description = (
-                f"Objects removed: {detections_before - detections_after} "
-                "fewer objects than previous image."
+                f"Decreased detections from {previous_detections_count} to "
+                f"{current_detections_count}."
             )
-        elif detections_after == 0 and detections_before == 0:
+        elif (
+            current_detections_count == previous_detections_count
+            and current_detections_count > 0
+        ):
             change_type = "NO_CHANGE"
-            description = "No objects detected in either image."
-        else:  # counts are equal but not zero, or other subtle changes
-            # This is where more complex geospatial comparison would go
-            # (e.g., Intersection over Union).
-            # For now, if counts are equal but not zero, we'll mark as no
-            # major count change.
-            change_type = (
-                "COUNT_CHANGED"
-                if detections_after != detections_before
-                else "NO_CHANGE"
-            )
-            description = (
-                f"Detection count is {detections_after}. "
-                "No significant change in count."
-            )
+            description = f"Detection count remains at {current_detections_count}."
+        elif current_detections_count == 0 and previous_detections_count == 0:
+            change_type = "NO_CHANGE"
+            description = "No detections found in either image."
+        # Optionally, add a random chance for "SITE_ACTIVITY_HIGH" to show varying results
+        if random.random() < 0.2:  # 20% chance
+            change_type = "SITE_ACTIVITY_HIGH"
+            description = "Mock: High site activity detected (random)."
+        elif random.random() < 0.1:  # 10% chance
+            change_type = "SITE_ACTIVITY_LOW"
+            description = "Mock: Low site activity detected (random)."
 
-        # 4. Generate ChangeLog entries based on identified differences.
+        # Store results in a ChangeLog model
         with transaction.atomic():
-            ChangeLog.objects.create(  # Renamed to _change_log
+            change_log = ChangeLog.objects.create(
                 site=site,
-                image_before=image_before,
-                image_after=image_after,
+                image_before=previous_image,
+                image_after=processed_image,
                 change_type=change_type,
                 description=description,
                 metadata=metadata,
             )
             print(
-                f"Created ChangeLog for site {site.name}: "
-                f"Type='{change_type}', Description='{description}'"
+                f"Created ChangeLog entry {change_log.pk}: '{description}'. "
+                "Triggering alert generation."
             )
+
+            # Trigger alert generation task
+            generate_alerts.delay(change_log.pk)
 
         return (
             f"Change detection completed for site {site.name}. "
-            f"Change Type: {change_type}."
+            f"Change Type: {change_type}. Alert generation initiated."
         )
 
     except Site.DoesNotExist:
+        print(f"Error: Site with ID {site_id} does not exist for change detection.")
+        raise
+    except SatelliteImage.DoesNotExist:
         print(
-            f"Error: Site with ID {site_id} does not exist for change detection. "
-            "Aborting task."
+            f"Error: Processed SatelliteImage with ID {processed_image_id} does not "
+            f"exist or not linked to site {site_id}."
         )
         raise
-
     except Exception as e:
         print(
             f"An unexpected error occurred during change detection for site "

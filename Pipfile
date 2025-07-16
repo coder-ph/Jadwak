@@ -17,6 +17,7 @@ rest-framework-simplejwt = "*"
 django-celery-results = "*"
 django-celery-beat = "*"
 pytz = "*"
+requests = "*"
 
 [dev-packages]
 pre-commit = "*"

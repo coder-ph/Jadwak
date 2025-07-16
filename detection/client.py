@@ -3,13 +3,14 @@
 import json
 import random
 import time
-from datetime import datetime
+from datetime import datetime  # Removed timedelta
 from typing import Any, Dict, List, Optional
 
 import pytz
-from django.conf import settings  # Re-introducing settings
+from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
-from django.utils import timezone  # Re-introducing timezone
+
+# from django.utils import timezone as django_timezone  # Removed: F401 unused import
 
 
 class AIMicroserviceClient:
@@ -37,16 +38,15 @@ class AIMicroserviceClient:
 
         This method simulates sending an image and receiving detection results.
         """
-        # In a real scenario, this would be an HTTP POST request to the AI service
         print(f"Sending image {image_url} for inference to {self.base_url}")
 
         # Simulate network delay
         time.sleep(random.uniform(0.5, 2.0))
-        detected_objects = []
+        detected_objects: List[Dict[str, Any]] = []
         num_detections = random.randint(0, 5)
 
         # Simulate detections
-        for _ in range(num_detections):  # Changed 'i' to '_'
+        for _ in range(num_detections):
             detected_class = random.choice(
                 ["EXCAVATOR", "CRANE", "TRUCK", "GRADER", "BULLDOZER"]
             )
@@ -57,12 +57,9 @@ class AIMicroserviceClient:
             y1 = random.randint(0, 800)
             x2 = x1 + random.randint(50, 200)
             y2 = y1 + random.randint(50, 200)
-            bbox_pixels = [x1, y1, x2, y2]  # Renamed for clarity
+            bbox_pixels = [x1, y1, x2, y2]
 
             # Simulate a geographic location (Point) for the detection
-            # This would be derived from image coordinates and geo-referencing
-            # in a real scenario. For mock, we'll just generate a random point
-            # near Nairobi.
             mock_lon = random.uniform(36.7, 36.9)
             mock_lat = random.uniform(-1.35, -1.2)
             location_point = Point(mock_lon, mock_lat, srid=4326)
@@ -70,11 +67,11 @@ class AIMicroserviceClient:
             detection_result = {
                 "class": detected_class,
                 "confidence": confidence,
-                "bbox_pixels": bbox_pixels,  # Use the new name
+                "bbox_pixels": bbox_pixels,
                 "geo_location": json.loads(
                     location_point.geojson
                 ),  # GeoJSON representation
-                "timestamp_utc": datetime.now(pytz.utc).isoformat(),  # Use pytz.utc
+                "timestamp_utc": pytz.utc.localize(datetime.now()).isoformat(),
                 "model_version": "YOLOv8-Mock-v1.0",
             }
             detected_objects.append(detection_result)
@@ -88,32 +85,49 @@ class AIMicroserviceClient:
         """Parse raw detection data from the AI service into a standardized format."""
         detected_class = raw_detection_data.get("class", "unknown")
         confidence = raw_detection_data.get("confidence", 0.0)
-        # 'coordinates' variable removed as it was unused.
-        # If bbox_pixels are needed, they will be part of metadata.
         bbox_pixels_from_raw = raw_detection_data.get("bbox_pixels", [])
 
         geo_location_geojson = json.dumps(raw_detection_data.get("geo_location", {}))
         location = GEOSGeometry(geo_location_geojson, srid=4326)
 
         timestamp_str = raw_detection_data.get(
-            "timestamp_utc", datetime.now(pytz.utc).isoformat()
+            "timestamp_utc",
+            pytz.utc.localize(
+                datetime.now()
+            ).isoformat(),  # Corrected default to timezone-aware datetime
         )
-        if timestamp_str:
-            parsed_dt_naive = datetime.fromisoformat(timestamp_str)
-            timestamp = pytz.utc.localize(parsed_dt_naive)
-        else:
-            # Fallback to Django's now() if timestamp_str is empty or invalid
-            timestamp = timezone.now()
+        timestamp = None
 
-        # Include bbox_pixels in metadata if desired, or omit if not needed downstream
-        metadata = raw_detection_data.get("metadata", {})
-        metadata["bbox_pixels"] = bbox_pixels_from_raw  # Add bbox_pixels to metadata
+        if timestamp_str:
+            try:
+                parsed_dt = datetime.fromisoformat(timestamp_str)
+                if (
+                    parsed_dt.tzinfo is not None
+                    and parsed_dt.tzinfo.utcoffset(parsed_dt) is not None
+                ):
+                    timestamp = parsed_dt.astimezone(pytz.utc)
+                else:
+                    timestamp = pytz.utc.localize(parsed_dt)
+
+            except ValueError:
+                print(
+                    f"Warning: Could not parse timestamp '{timestamp_str}'. "
+                    "Falling back to current UTC time."
+                )
+
+                timestamp = pytz.utc.localize(datetime.now())
+
+        else:
+            timestamp = pytz.utc.localize(datetime.now())
+
+        metadata_dict = raw_detection_data.copy()
 
         return {
             "detected_class": detected_class,
             "confidence": confidence,
+            "coordinates": bbox_pixels_from_raw,
             "location": location,
             "timestamp": timestamp,
-            "metadata": metadata,  # Now includes bbox_pixels
+            "metadata": metadata_dict,
             "model_version": raw_detection_data.get("model_version", "unknown"),
         }

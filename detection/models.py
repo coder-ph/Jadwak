@@ -25,12 +25,16 @@ class Detection(models.Model):
         help_text="Confidence score of the detection, between 0 and 1."
     )
 
+    coordinates = models.JSONField(
+        help_text="Bounding box coordinates in image pixel space [x1, y1, x2, y2]"
+    )
+
     location = models.PointField(
         srid=4326, help_text="Geospatial location of the detection (WGS84)."
     )
 
     timestamp = models.DateTimeField(
-        auto_created=True, help_text="Timestamp when the detection was made."
+        auto_now_add=True, help_text="Timestamp when the detection was made."
     )
 
     metadata = models.JSONField(

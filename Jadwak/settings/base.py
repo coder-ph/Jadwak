@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "core",
     "django_filters",
     "detection",
+    "alerts",
 ]
 
 MIDDLEWARE = [

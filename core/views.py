@@ -1,6 +1,8 @@
 """view definitions for core app."""
 
 from datetime import datetime
+import json
+import pytz
 
 # Third-party imports
 from django.db.models import QuerySet
@@ -22,6 +24,7 @@ from .serializers import GISLayerSerializer
 from .serializers import SatelliteImageSerializer, SiteSerializer
 
 from detection.tasks import process_image_detections
+from detection.models import Detection
 
 
 class IsSiteOwnerOrAdmin(permissions.BasePermission):
@@ -200,3 +203,106 @@ class SatelliteImageViewSet(viewsets.ReadOnlyModelViewSet):
             {"message": "AI detection processing initiated successfully."},
             status=status.HTTP_202_ACCEPTED,
         )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="detections-geojson",
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def detections_geojson(
+        self: "SatelliteImageViewSet",
+        request: Request,
+        pk: int = None,
+        site_pk: int = None,
+    ) -> Response:
+        """Retrieve detections for a SatelliteImage in GeoJSON format."""
+        satellite_image = get_object_or_404(SatelliteImage, pk=pk, site__pk=site_pk)
+        detections = satellite_image.detections.all()
+
+        if not request.user.is_staff and satellite_image.site.owner != request.user:
+            return Response(
+                {"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN
+            )
+        features = []
+        for det in detections:
+            if det.location:
+                feature = {
+                    "type": "Feature",
+                    "geometry": json.loads(det.location.geojson),
+                    "properties": {
+                        "detected_class": det.detected_class,
+                        "confidence": det.confidence,
+                        "timestamp": det.timestamp.isoformat(),
+                        "metadata": det.metadata,
+                        "satellite_image_id": satellite_image.id,
+                        "site_name": satellite_image.site.name,
+                        "bbox_pixels": det.coordinates,
+                    },
+                }
+                features.append(feature)
+
+            geojson_data = {"type": "FeatureCollection", "features": features}
+            return Response(geojson_data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="all-detections-geojson",
+        permission_classes=[permissions.IsAuthenticated],
+    )
+    def all_detections_geojson(
+        self: "SatelliteImageViewSet", request: Request, site_pk: int = None
+    ) -> Response:
+        """Return a GeoJSON FeatureCollection of all detections for a site."""
+        site = get_object_or_404(Site, pk=site_pk)
+        queryset = Detection.objects.filter(satellite_image__site=site).select_related(
+            "satellite_image__site"
+        )
+        date_after_str = request.query_params.get("date_after")
+        date_before_str = request.query_params.get("date_before")
+
+        if date_after_str:
+            try:
+                date_after = datetime.fromisoformat(date_after_str).replace(
+                    tzinfo=pytz.utc
+                )
+                queryset = queryset.filter(timestamp__gte=date_after)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date_after format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if date_before_str:
+            try:
+                date_before = datetime.fromisoformat(date_before_str).replace(
+                    tzinfo=pytz.utc
+                )
+                queryset = queryset.filter(timestamp__lte=date_before)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date_before format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        features = []
+        for det in queryset:
+            if det.location:
+                feature = {
+                    "type": "Feature",
+                    "geometry": json.loads(det.location.geojson),
+                    "properties": {
+                        "id": det.id,
+                        "detected_class": det.detected_class,
+                        "confidence": det.confidence,
+                        "timestamp": det.timestamp.isoformat(),
+                        "satellite_image_id": det.satellite_image.id,
+                        "site_name": det.satellite_image.site.name,
+                        "bbox_pixels": det.location,
+                    },
+                }
+                features.append(feature)
+
+        geojson_data = {"type": "FeatureCollection", "features": features}
+        return Response(geojson_data)

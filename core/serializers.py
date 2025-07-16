@@ -3,6 +3,9 @@
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
+from detection.serializers import DetectionSerializer
+
+
 from .models import GISLayer, SatelliteImage, Site
 
 
@@ -62,6 +65,10 @@ class SatelliteImageSerializer(GeoFeatureModelSerializer):
 
     site_name = serializers.ReadOnlyField(source="site.name")
 
+    detection_data = DetectionSerializer(source="detections", many=True, read_only=True)
+
+    thumbnail_url = serializers.SerializerMethodField()
+
     class Meta:
         """Meta options for the SatelliteImageSerializer."""
 
@@ -81,5 +88,13 @@ class SatelliteImageSerializer(GeoFeatureModelSerializer):
             "status",
             "created_at",
             "updated_at",
+            "thumbnail_url",
+            "detection_data",
         )
         read_only_fields = ("created_at", "updated_at")
+
+    def get_thumbnail_url(self: SatelliteImage, obj: SatelliteImage) -> str:
+        """Generate a URL for the thumbnail of the satellite image."""
+        if obj.image_file:
+            return obj.image_file.url.replace("images/", "thumbnails/")
+        return None

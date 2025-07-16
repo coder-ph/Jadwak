@@ -30,4 +30,14 @@ urlpatterns = [
         ),  # Map POST request to run_detection method
         name="satelliteimage-run-detection",
     ),
+    path(
+        "sites/<int:site_pk>/images/<int:pk>/detections-geojson/",
+        SatelliteImageViewSet.as_view({"get": "detections_geojson"}),
+        name="satelliteimage-detections-geojson",
+    ),
+    path(
+        "sites/<int:site_pk>/all-detections-geojson/",
+        SatelliteImageViewSet.as_view({"get": "all_detections_geojson"}),
+        name="site-all-detections-geojson",
+    ),
 ]
